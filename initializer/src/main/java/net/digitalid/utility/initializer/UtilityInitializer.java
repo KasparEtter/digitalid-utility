@@ -122,6 +122,15 @@ public abstract class UtilityInitializer {
         }
     }
     
+    /**
+     * Initializes the logger of the configuration class.
+     */
+    @PureWithSideEffects
+    @Initialize(target = Configuration.class, dependencies = Logger.class)
+    public static void initializeConfigurationLogger() {
+        Configuration.logger.set(string -> Log.debugging(string));
+    }
+    
     /* -------------------------------------------------- Threading -------------------------------------------------- */
     
     /**

@@ -37,6 +37,7 @@ import net.digitalid.utility.configuration.errors.DependencyErrorBuilder;
 import net.digitalid.utility.configuration.errors.InitializerError;
 import net.digitalid.utility.configuration.errors.InitializerErrorBuilder;
 import net.digitalid.utility.contracts.Require;
+import net.digitalid.utility.functional.interfaces.Consumer;
 import net.digitalid.utility.functional.iterables.FiniteIterable;
 import net.digitalid.utility.validation.annotations.method.Chainable;
 import net.digitalid.utility.validation.annotations.type.Functional;
@@ -188,6 +189,14 @@ public class Configuration<@Unspecifiable PROVIDER> {
     @Override
     public @Nonnull String toString() {
         return getClassName();
+    }
+    
+    /**
+     * Returns the qualified name of the class and the line number where this configuration is declared.
+     */
+    @Pure
+    public @Nonnull String toLongString() {
+        return new StringBuilder(getQualifiedClassName()).append(":").append(getLineNumber()).toString();
     }
     
     /* -------------------------------------------------- Configurations -------------------------------------------------- */
@@ -364,6 +373,13 @@ public class Configuration<@Unspecifiable PROVIDER> {
         return this;
     }
     
+    /* -------------------------------------------------- Configuration -------------------------------------------------- */
+    
+    /**
+     * Stores a consumer that logs the initialization if set.
+     */
+    public static final @Nonnull Configuration<Consumer<String>> logger = Configuration.withUnknownProvider();
+    
     /* -------------------------------------------------- Initialization -------------------------------------------------- */
     
     private boolean initialized = false;
@@ -386,6 +402,11 @@ public class Configuration<@Unspecifiable PROVIDER> {
         if (!initialized) {
             this.initialized = true;
             for (@Nonnull Configuration<?> dependency : dependencies) { dependency.initialize(); }
+            if (logger.isSet()) {
+                final @Nonnull StringBuilder string = new StringBuilder("Initializing ").append(toLongString().replace("net.digitalid.", ""));
+                if (!dependencies.isEmpty()) { string.append(" depending on ").append(FiniteIterable.of(dependencies).join()); }
+                logger.get().consume(string.toString());
+            }
             for (@Nonnull Initializer initializer : initializers) {
                 try {
                     initializer.execute();
