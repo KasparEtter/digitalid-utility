@@ -118,19 +118,19 @@ public class ConverterGenerator extends JavaFileGenerator {
     /* -------------------------------------------------- Externally and Non-Externally Provided Fields -------------------------------------------------- */
     
     /**
-     * Returns all field information objects that do not have a @Provided annotation.
+     * Returns the fields that have to be converted (because they are representative but not provided).
      */
     @Pure
-    private @Nonnull FiniteIterable<@Nonnull FieldInformation> filterNonExternallyProvidedFields(@Nonnull FiniteIterable<@Nonnull FieldInformation> fieldInformation) {
-        return fieldInformation.filter(field -> !field.hasAnnotation(Provided.class));
+    private @Nonnull FiniteIterable<@Nonnull FieldInformation> getFieldsToBeConverted() {
+        return typeInformation.getRepresentingFieldInformation().filter(field -> !field.hasAnnotation(Provided.class));
     }
     
     /**
-     * Returns all field information objects that do have a @Provided annotation.
+     * Returns the fields that are provided (and thus do not need to be converted).
      */
     @Pure
-    private @Nonnull FiniteIterable<@Nonnull FieldInformation> filterExternallyProvidedFields(@Nonnull FiniteIterable<@Nonnull FieldInformation> fieldInformation) {
-        return fieldInformation.filter(field -> field.hasAnnotation(Provided.class));
+    private @Nonnull FiniteIterable<@Nonnull FieldInformation> getProvidedFields() {
+        return typeInformation.getFieldInformation().filter(field -> field.hasAnnotation(Provided.class));
     }
     
     /**
@@ -140,15 +140,15 @@ public class ConverterGenerator extends JavaFileGenerator {
     @SuppressWarnings("AssignmentToMethodParameter")
     private @Nonnull String getExternallyProvidedParameterDeclarationsAsString(@Nonnull String postFix) {
         postFix = postFix.isEmpty() ? postFix : " " + postFix;
-        final @Nonnull FiniteIterable<@Nonnull FieldInformation> externallyProvidedFields = filterExternallyProvidedFields(typeInformation.getRepresentingFieldInformation());
-        final @Nonnull String parameterTypes = externallyProvidedFields.map(field -> importIfPossible(field.getType())).join();
-        final @Nullable Class<?> tupleType = Tuple.getTupleType(externallyProvidedFields.size());
+        final @Nonnull FiniteIterable<@Nonnull FieldInformation> providedFields = getProvidedFields();
+        final @Nonnull String parameterTypes = providedFields.map(field -> importIfPossible(field.getType())).join();
+        final @Nullable Class<?> tupleType = Tuple.getTupleType(providedFields.size());
         if (tupleType == null) {
-            switch (externallyProvidedFields.size()) {
+            switch (providedFields.size()) {
                 case 0:
                     return importIfPossible(Void.class) + postFix;
                 case 1:
-                    return importIfPossible(externallyProvidedFields.getFirst().getType()) + postFix;
+                    return importIfPossible(providedFields.getFirst().getType()) + postFix;
                 default:
                     throw FailedClassGenerationException.with("Cannot accept more than 8 externally provided parameters.");
             }
@@ -161,12 +161,12 @@ public class ConverterGenerator extends JavaFileGenerator {
      */
     @Pure
     private @Nonnull String getExternallyProvidedParameterNameAsString() {
-        final @Nonnull FiniteIterable<@Nonnull FieldInformation> externallyProvidedFields = filterExternallyProvidedFields(typeInformation.getRepresentingFieldInformation());
-        switch (externallyProvidedFields.size()) {
+        final @Nonnull FiniteIterable<@Nonnull FieldInformation> providedFields = getProvidedFields();
+        switch (providedFields.size()) {
             case 0:
                 return "none";
             case 1:
-                return externallyProvidedFields.getFirst().getName();
+                return providedFields.getFirst().getName();
             case 2:
             case 3:
             case 4:
@@ -277,7 +277,7 @@ public class ConverterGenerator extends JavaFileGenerator {
         addAnnotation(Pure.class);
         addAnnotation(Override.class);
         beginMethod("public " + Brackets.inPointy("EXCEPTION extends " + importIfPossible(ConnectionException.class)) + " void convert(@" + importIfPossible(NonCaptured.class) + " @" + importIfPossible(Unmodified.class) + " @" + importIfPossible(Nonnull.class) + " " + typeInformation.getName() + " " + getObjectVariableName() + ", @" + importIfPossible(Nonnull.class) + " @" + importIfPossible(NonCaptured.class) + " @" + importIfPossible(Modified.class) + " " + importIfPossible(Encoder.class) + Brackets.inPointy("EXCEPTION") + " encoder) throws EXCEPTION");
-        filterNonExternallyProvidedFields(typeInformation.getRepresentingFieldInformation()).doForEach(this::addEncodingStatement);
+        getFieldsToBeConverted().doForEach(this::addEncodingStatement);
 //        for (@Nonnull FieldInformation field : fields) {
 //            final @Nonnull String fieldAccess = objectVariableName + "." + field.getAccessCode();
 //            addStatement("i *= " + generateValueCollectorCall(fieldAccess, field.getType(), 1));
@@ -411,16 +411,16 @@ public class ConverterGenerator extends JavaFileGenerator {
         addAnnotation(Pure.class);
         addAnnotation(Override.class);
         beginMethod("public @" + importIfPossible(Capturable.class) + " @" + importIfPossible(Nonnull.class) + " " + Brackets.inPointy("EXCEPTION extends " + importIfPossible(ConnectionException.class)) + " " + typeInformation.getName() + " recover(@" + importIfPossible(Nonnull.class) + " @" + importIfPossible(NonCaptured.class) + " " + importIfPossible(Decoder.class) + Brackets.inPointy("EXCEPTION") + " decoder, " + getExternallyProvidedParameterDeclarationsAsString(getExternallyProvidedParameterNameAsString()) + ") throws EXCEPTION, " + importIfPossible(RecoveryException.class));
-        final @Nonnull FiniteIterable<@Nonnull FieldInformation> externallyProvidedFields = filterExternallyProvidedFields(typeInformation.getRepresentingFieldInformation());
+        final @Nonnull FiniteIterable<@Nonnull FieldInformation> providedFields = getProvidedFields();
         
-        if (externallyProvidedFields.size() > 1) {
+        if (providedFields.size() > 1) {
             int i = 0;
-            for (@Nonnull FieldInformation externallyProvidedField : externallyProvidedFields) {
+            for (@Nonnull FieldInformation externallyProvidedField : providedFields) {
                 addStatement("final " + importIfPossible(externallyProvidedField.getType()) + " " + externallyProvidedField.getName() + " = provided.get" + i++ + "()");
             }
         }
         
-        final @Nonnull FiniteIterable<@Nonnull FieldInformation> fields = filterNonExternallyProvidedFields(typeInformation.getRepresentingFieldInformation());
+        final @Nonnull FiniteIterable<@Nonnull FieldInformation> fields = getFieldsToBeConverted();
         
 //        for (@Nonnull FieldInformation constructorParameter : fields) {
 //            final @Nonnull String provide = constructorParameter.hasAnnotation(Provide.class) ? constructorParameter.getAnnotation(Provide.class).value() : "null";
@@ -434,7 +434,7 @@ public class ConverterGenerator extends JavaFileGenerator {
         fields.doForEach(this::addDecodingStatement);
         final @Nullable ExecutableInformation recoverConstructorOrMethod = typeInformation.getRecoverConstructorOrMethod();
         if (!getThrownTypesOfInitializeMethod().isEmpty() || recoverConstructorOrMethod != null && recoverConstructorOrMethod.throwsExceptions()) { beginTry(); }
-        addStatement(typeInformation.getInstantiationCode(true, true, true, externallyProvidedFields.combine(fields)));
+        addStatement(typeInformation.getInstantiationCode(true, true, true, providedFields.combine(fields)));
         if (!getThrownTypesOfInitializeMethod().isEmpty() || recoverConstructorOrMethod != null && recoverConstructorOrMethod.throwsExceptions()) {
             if (recoverConstructorOrMethod != null && recoverConstructorOrMethod.throwsExceptions()) {
                 endTryOrCatchBeginCatch(recoverConstructorOrMethod.getElement().getThrownTypes());
@@ -477,7 +477,7 @@ public class ConverterGenerator extends JavaFileGenerator {
         final @Nonnull StringBuilder fieldsString = new StringBuilder();
         final @Nonnull List<@Nonnull String> statements = new ArrayList<>();
         boolean addedMap = false;
-        for (@Nonnull FieldInformation representingField : filterNonExternallyProvidedFields(typeInformation.getRepresentingFieldInformation())) {
+        for (@Nonnull FieldInformation representingField : getFieldsToBeConverted()) {
             final @Nonnull StringBuilder customAnnotations = new StringBuilder();
             final @Nonnull FiniteIterable<@Nonnull AnnotationMirror> annotations = representingField.getAnnotations();
             final @Nonnull String fieldName = representingField.getName();
