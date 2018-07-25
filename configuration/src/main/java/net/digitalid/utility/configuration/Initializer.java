@@ -58,6 +58,6 @@ public abstract class Initializer {
      * @throws Exception if any problems occur.
      */
     @Impure
-    protected abstract void execute() throws Exception;
+    public abstract void execute() throws Exception;
     
 }

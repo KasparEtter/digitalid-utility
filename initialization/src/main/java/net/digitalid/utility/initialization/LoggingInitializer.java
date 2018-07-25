@@ -59,7 +59,7 @@ public abstract class LoggingInitializer extends Initializer {
     
     @Impure
     @Override
-    protected final void execute() throws Exception {
+    public final void execute() throws Exception {
         Log.debugging("The initializer " + this + " begins its execution.");
         final long start = System.currentTimeMillis();
         executeWithoutLogging();
